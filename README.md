@@ -13,10 +13,23 @@ Why I need one more type validator?
 
 Because I wanted to have type validation which:
 
-- super light and easy
-- done with typescript in mind
-- supports transformations (e.g. I can convert strings to numbers on the fly, if I want to do so)
-- easy extensible with custom validators
+- Super light and easy
+
+  Library is small. No core with tons of unnecessary functionality.
+  Each validator is exported separately. So if you use tree shaking in your project, only validators used by you 
+  will be in your bundle.
+
+- Written with typescript in mind
+    
+  It always returns typed results
+
+- Support of transformations
+
+  E.g. I can convert strings to numbers on the fly, if I want to do so
+
+- Easy extensible with custom validators
+
+  Validator is a function. Adding new one is as simple, as writing new function.
 
 Documentation
 -------------
@@ -82,13 +95,13 @@ Possible options:
 - max
 
 ```ts
-const validator1 = int() 
+const validator1 = float() 
 validator1(5.2, 'myValue'); // returns: 5 
 
-const validator2 = int({min: 1});
+const validator2 = float({min: 1});
 validator2(5.2, 'myValue'); // returns: 5
 
-const validator3 = int({min: 0, max: 4});
+const validator3 = float({min: 0, max: 4});
 validator3(5.2, 'myValue'); // throws: [myValue] isn't in allowed range
 ```
 
@@ -337,21 +350,48 @@ validator('asd', 'myValue');
 Custom validators
 -----------------
 
-The power here is in the simplicity. It's so simple, that it's even hard to call it a library.
+The idea here is simple. To check any type of value you should to create a validator.
 
-There isn't any core functionality. There are just few conventions, validators are built.
-
-To check any type of value you should to create a validator.
-Validator is a function which receives 2 parameters: value to validate and a path.
-In case of validation error, validator should throw an error, using path to point at a place of shape, where validation 
-failed. In case of success validatior should return a value. Validator can return the same value which was received, or
-modify it if needed.
+__Validator is a function__ which receives 2 parameters: _value_ to validate and a _path_.
 
 ```ts
 type Validator<T> = (v: any, path: string) => T;
 ```
 
-E.g. to create new validator which checks, does value exactly match given example, we can write:
+In case of validation error, validator should throw an error, using _path_ to point at a place of shape, where validation 
+failed. In case of success validator should return a value. Validator can return the same value which was received, or
+modify it if needed.
+
+You can make inline validators. E.g.:
+
+```ts
+const myValidator = object({
+  id: string(),
+  type: (v, path): string => {
+      if (typeof v !== 'string' || !v.startsWith('TYPE__')) {
+          throw new Error(`[${path}] is not correct type`);
+      }
+      return v;
+  }
+});
+```
+
+If you want to crate reusable validator, the convention is to wrap it into one more function, which can additionally
+receive options as parameters. E.g. _int_ validator looks like:
+
+```ts
+export const int = ({min, max}: {min?: number; max?: number} = {}): Validator<number> => (v, path) => {
+    if (!Number.isInteger(v)) {
+        throw new Error(`[${path}] should be an integer`);
+    }
+    if ((min !== undefined && v < min) || (max !== undefined && v > max)) {
+        throw new Error(`[${path}] isn\'t in allowed range`);
+    }
+    return v;
+};
+```
+
+Let's create one more validator, which checks, does value exactly match given example:
 
 ```ts
 const exactMatch = <T>(exactValue: T): Validator<T> => (v, path) => {
@@ -360,11 +400,19 @@ const exactMatch = <T>(exactValue: T): Validator<T> => (v, path) => {
     }
     return v;
 };
+```
 
+We can use itself:
+
+```ts
 // let's check value 
-exactMatch(5)(10, 'myValue'); // throws: [myValue] isn't the same as allowed value
+const validator = exactMatch(5);
+validator(10, 'myValue'); // throws: [myValue] isn't the same as allowed value
+```
 
-// or let's combine it with other validators
+... or let's combine it with other validators
+
+```ts
 import {object, optional} from 'checkeasy';
 const validator = object({
     a: exactMatch(5),

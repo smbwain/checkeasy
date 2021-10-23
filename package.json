@@ -1,6 +1,6 @@
 {
   "name": "checkeasy",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Light, expressive and type-safe data validation in typescript",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
