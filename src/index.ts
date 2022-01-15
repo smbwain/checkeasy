@@ -25,6 +25,11 @@ export const nullable = <T>(handler: Validator<T>): Validator<T | null> => (v, p
 
 export const object = <Description extends Record<string, Validator<any>>>(
     desc: Description,
+    {ignoreUnknown, min, max}: {
+        ignoreUnknown?: boolean;
+        min?: number;
+        max?: number;
+    } = {},
 ): Validator<{
     [key in keyof Description]: Description[key] extends Validator<infer T> ? T : never;
 }> => (v, path) => {
@@ -35,9 +40,16 @@ export const object = <Description extends Record<string, Validator<any>>>(
     for (const key in desc) {
         res[key] = desc[key](v[key], `${path}.${key}`);
     }
+    if ((min !== undefined && Object.keys(v).length < min) || (max !== undefined && Object.keys(v).length > max)) {
+        throw new Error(`[${path}] size isn\'t in allowed range`);
+    }
     for (const key in v) {
         if (!desc[key]) {
-            throw new Error(`Property [${path}.${key}] is unknown`);
+            if (ignoreUnknown) {
+                res[key] = v[key];
+            } else {
+                throw new Error(`Property [${path}.${key}] is unknown`);
+            }
         }
     }
     return res;
@@ -133,7 +145,7 @@ export const arrayOf = <T>(itemValidator: Validator<T>, {min, max}: {
     if ((min !== undefined && v.length < min) || (max !== undefined && v.length > max)) {
         throw new Error(`[${path}] length isn\'t in allowed range`);
     }
-    return v.map((item, index) => itemValidator(item, `${path}.@item(${index})`));
+    return v.map((item, index) => itemValidator(item, `${path}[${index}]`));
 };
 
 export const UUID = () => string({
@@ -153,6 +165,15 @@ export const oneOf = <T>(
 ): Validator<T> => (v, path): T => {
     if (values.indexOf(v) === -1) {
         throw new Error(`[${path}] isn't equal to any of predefined values`);
+    }
+    return v;
+};
+
+export const exact = <T>(
+    value: T,
+): Validator<T> => (v, path) => {
+    if (value !== v) {
+        throw new Error(`[${path}] isn't equal to predefined value`);
     }
     return v;
 };

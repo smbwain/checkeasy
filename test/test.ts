@@ -1,7 +1,7 @@
 import {
     alternatives,
     arrayOf,
-    boolean, defaultValue,
+    boolean, defaultValue, exact,
     float,
     int, nullable,
     object,
@@ -164,6 +164,32 @@ describe('validation functions', () => {
             object({})({a: 5}, 'test');
         }).toThrow('Property [test.a] is unknown');
 
+        expect(object({}, {
+            ignoreUnknown: true,
+        })({a: 5}, 'test')).toEqual({a: 5});
+
+        expect(() => {
+            object({}, {
+                ignoreUnknown: true,
+                min: 2,
+                max: 3,
+            })({a: 5}, 'test');
+        }).toThrow('[test] size isn\'t in allowed range');
+
+        expect(() => {
+            object({}, {
+                ignoreUnknown: true,
+                min: 2,
+                max: 3,
+            })({a: 5, b: 5, c: 5, d: 5}, 'test');
+        }).toThrow('[test] size isn\'t in allowed range');
+
+        expect(object({}, {
+            ignoreUnknown: true,
+            min: 2,
+            max: 3,
+        })({a: 5, b: 5, c: 5}, 'test')).toEqual({a: 5, b: 5, c: 5});
+
         expect(object({a: v => v})({a: 5}, 'test')).toEqual({a: 5});
 
         expect(() => {
@@ -173,6 +199,8 @@ describe('validation functions', () => {
         expect(object({a: v => v})({}, 'test')).toEqual({a: undefined});
 
         expect(object({})({}, 'test')).toEqual({});
+
+
     });
 
     it('should validate arrayOf correctly', () => {
@@ -186,7 +214,7 @@ describe('validation functions', () => {
 
         expect(() => {
             arrayOf(int())([1, 2, '3'], 'test');
-        }).toThrow('[test.@item(2)] should be an integer');
+        }).toThrow('[test[2]] should be an integer');
 
         expect(() => {
             arrayOf(int(), {max: 2})([1, 2, 3, 'abc'], 'test');
@@ -198,7 +226,14 @@ describe('validation functions', () => {
 
         expect(() => {
             arrayOf(object({a: string()}))([{a: 2}], 'test');
-        }).toThrow('[test.@item(0).a] should be a string');
+        }).toThrow('[test[0].a] should be a string');
+    });
+
+    it('should validate exact correctly', () => {
+        expect(exact(1)(1, 'test')).toEqual(1);
+        expect(() => {
+            exact(1)(2, 'test');
+        }).toThrow('[test] isn\'t equal to predefined value');
     });
 
     it('should validate oneOf correctly', () => {
@@ -294,32 +329,6 @@ describe('validation functions', () => {
             }))({a: 456}, 'test');
         }).toThrow('[test.a] should be a string');
     });
-
-    // it('should validate complex example', () => {
-    //     const myValidator = object({
-    //         a: int({max: 5}),
-    //         b: string(),
-    //         c: optional(float()),
-    //         d: oneOf(['a', 'b', 7] as const),
-    //         e: alternatives([string(), int()]),
-    //         f: arrayOf(string()),
-    //         g: object({
-    //             subP: string(),
-    //         }),
-    //     });
-    //
-    //     const value = myValidator({
-    //         a: 5,
-    //         b: 'aaa',
-    //         c: 45,
-    //         d: 'b',
-    //         e: 41,
-    //         f: ['sad', 'asd'],
-    //         g: {
-    //             subP: 'asd',
-    //         }
-    //     }, 'data');
-    // });
 
     it('should make transform', () => {
         const validator = alternatives([

@@ -3,7 +3,7 @@ checkeasy
 
 Light, expressive and type-safe data validation in typescript.
 
-![Image of Yaktocat](docs/example.png)
+![Example](docs/example.png)
 
 As you can see, you DON'T NEED to write your schema twice (for validation and for typescript).
 Just use validator functions, which return well typed results. So typescript is acknowledged about shape of your data and checks its usages on compilation stage.
@@ -44,6 +44,7 @@ Documentation
     - [strToBoolean](#strtoboolean)
     - [object](#object)
     - [arrayOf](#arrayof)
+    - [exact](#exact)
     - [oneOf](#oneof)
     - [alternatives](#alternatives)
     - [optional](#optional)
@@ -157,8 +158,9 @@ It's convenient for validating/parsing url params, which initially are strings.
 
 Check if a value is an object and runs validation on all of its properties by given shape.
 
-Receives single parameter, which should be an object.
-Values of this object should be validators, which will be called to check properties.
+Receives 1 or 2 parameters.
+
+First one should be an object. Values of this object should be validators, which will be called to check properties.
 
 ```ts
 const validator = object({
@@ -172,6 +174,24 @@ validator({a: 5, c: 'anystring'}, 'myValue'); // returns: {a: 5, b: undefined, c
 validator({a: 5, b: 25, c: 'anystring'}, 'myValue'); // throws: [myValue.b] should be a string
 
 validator('something totally different', 'myValue'); // throws: [myValue] should be an object
+```
+
+There are additional options can be passed with second param:
+
+- ignoreUnknown - ignore properties which are not described in first param (by default: false)
+- min - min amount of object properties
+- max - max amount of object properties
+
+```ts
+const validator = object({
+    a: int(),
+    b: optional(string({max: 3})),
+    c: v => v,
+}, {
+  ignoreUnknown: true,
+  min: 2,
+  max: 3,
+});
 ```
 
 ## arrayOf
@@ -191,7 +211,7 @@ const validator2 = arrayOf(int());
 validator2({a: 2}, 'myValue'); // throws: [myValue] should be an array
 
 const validator3 = arrayOf(int());
-validator3([1, 2, '3'], 'myValue'); // throws: [myValue.@item(3)] should be an integer
+validator3([1, 2, '3'], 'myValue'); // throws: [myValue[3]] should be an integer
 
 const validator4 = arrayOf(int(), {max: 2});
 validator4([1, 2, 3, 'abc'], 'myValue'); // throws: [myValue] length isn't in allowed range
@@ -202,7 +222,23 @@ const validator5 = arrayOf(
     }),
 );
 validator5([{a: 'aa'}], 'myValue'); // returns: [{a: 'aa'}]
-validator5([{a: 2}], 'myValue'); // throws: [myValue.@item(0).a] should be a string
+validator5([{a: 2}], 'myValue'); // throws: [myValue[0].a] should be a string
+```
+
+## exact
+
+Checks if value strictly equals one of the given values.
+
+```ts
+const validator1 = exact(1);
+validator1(1, 'myValue'); // returns: 1
+
+const validator2 = exact(1)
+validator2('1', 'myValue'); // throws: [myValue] isn't equal to predefined value
+
+const validator3 = exact({a: 1});
+validator3({a: 1}, 'myValue'); // throws: [myValue] isn't equal to predefined value
+    // it's because it doesn't make deepEqual
 ```
 
 ## oneOf
@@ -214,10 +250,10 @@ const validator1 = oneOf([1, 2, '3'] as const);
 validator1('3', 'myValue'); // returns: 3
 
 const validator2 = oneOf([1, 2, '3'] as const)
-validator2(3, 'myValue'); // throws: [myValue] isn't equal to any of predefined value
+validator2(3, 'myValue'); // throws: [myValue] isn't equal to any of predefined values
 
 const validator3 = oneOf([1, 2, {a: 1}] as const);
-validator3({a: 1}, 'myValue'); // throws: [myValue] isn't equal to any of predefined value
+validator3({a: 1}, 'myValue'); // throws: [myValue] isn't equal to any of predefined values
     // it's because it doesn't make deepEqual
 ```
 
@@ -262,7 +298,6 @@ validator({a: 5}, 'myValue');
 Add undefined as a possible value to given validator. Although, it can be used itself, it's very helpful for optional values in objects.
 
 ```ts
-
 const validator = object({
     a: optional(string()),
 });
@@ -273,11 +308,15 @@ validator({a: null}, 'myValue'); // throws: [myValue.a] should be a string
   // (null is not the same as undefined)
 ```
 
+> Don't forget to enable typescript strictNullChecks config, if you want typescript to check null and undefined in resulting types.
+
 ## nullable
 
 Similar to optional. But instead of _undefined_, it allows value be null.
 
-If you want to have optional nullable value, of course you can make a composition of `optional(nullable(...))`.
+> Don't forget to enable typescript strictNullChecks config, if you want typescript to check null and undefined in resulting types.
+
+If you want to have optional and nullable value (so null and undefined will be allowed), you can make a composition of `optional(nullable(...))`.
 
 ## defaultValue
 

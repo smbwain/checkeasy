@@ -6,7 +6,8 @@
     "removeComments": true,
     "preserveConstEnums": true,
     "outDir": "dist",
-    "declaration": true
+    "declaration": true,
+    "strictNullChecks": true
   },
   "include": [
     "src"
