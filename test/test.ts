@@ -257,13 +257,13 @@ describe('validation functions', () => {
 
         expect(() => {
             alternatives([string(), int()])(undefined, 'test');
-        }).toThrow('Input did not match any allowed options for [test]:\n\t[test (option 1)] should be a string\n\t[test (option 2)] should be an integer');
+        }).toThrow('Input did not match any allowed options for [test]:\n\t[*] should be a string\tOR\n\t[*] should be an integer');
 
         expect(alternatives([string(), object({a: string()})])({a: '5'}, 'test')).toEqual({a: '5'});
 
         expect(() => {
             alternatives([string(), object({a: string()})])({a: 5}, 'test');
-        }).toThrow('Input did not match any allowed options for [test]:\n\t[test (option 1)] should be a string\n\t[test (option 2).a] should be a string');
+        }).toThrow('Input did not match any allowed options for [test]:\n\t[*] should be a string\tOR\n\t[*.a] should be a string');
     });
 
     it('should validate optional correctly', () => {
@@ -345,9 +345,9 @@ describe('validation functions', () => {
         expect(validator({type: 'user', id: '1'}, 'myValue')).toEqual('user:1');
         expect(() => {
             validator({type: 'user'}, 'myValue');
-        }).toThrow('Input did not match any allowed options for [myValue]:\n\t[myValue (option 1)] should be a string\n\t[myValue (option 2).id] should be a string');
+        }).toThrow('Input did not match any allowed options for [myValue]:\n\t[*] should be a string\tOR\n\t[*.id] should be a string');
         expect(() => {
             validator('asd', 'myValue');
-        }).toThrow('Input did not match any allowed options for [myValue]:\n\t[myValue (option 1)] doesn\'t match the pattern\n\t[myValue (option 2)] should be an object');
+        }).toThrow('Input did not match any allowed options for [myValue]:\n\t[*] doesn\'t match the pattern\tOR\n\t[*] should be an object');
     });
 });

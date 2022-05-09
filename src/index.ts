@@ -142,12 +142,12 @@ export const alternatives = <Alts extends ReadonlyArray<Validator<any>>>(
     const errs: string[] = [];
     for (let i = 0; i < alts.length; i++) {
         try {
-            return alts[i](v, `${path} (option ${i + 1})`);
+            return alts[i](v, `*`);
         } catch (err: any) {
             errs.push(err.message);
         }
     }
-    throw new ValidationError(`Input did not match any allowed options for [${path}]:\n\t${errs.join('\n\t')}`);
+    throw new ValidationError(`Input did not match any allowed options for [${path}]:\n\t${errs.join('\tOR\n\t')}`);
 };
 
 export const arrayOf = <T>(itemValidator: Validator<T>, {min, max}: {
