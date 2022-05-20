@@ -10,6 +10,7 @@ import {
     string, strToBoolean,
     strToFloat,
     strToInt, transform,
+    ValidationError,
 } from '../src';
 
 describe('validation functions', () => {
@@ -34,11 +35,11 @@ describe('validation functions', () => {
 
         expect(() => {
             int({min: 5})(4, 'test');
-        }).toThrow('[test] is smaller (4) than the allowed minimum (5)');
+        }).toThrow('[test] is smaller than the allowed minimum (5)');
 
         expect(() => {
             int({max: 10})(12, 'test');
-        }).toThrow('[test] is larger (12) than the allowed maximum (10)');
+        }).toThrow('[test] is larger than the allowed maximum (10)');
 
         expect(() => {
             int()(0.5, 'test');
@@ -80,11 +81,11 @@ describe('validation functions', () => {
 
         expect(() => {
             float({min: 5})(4, 'test');
-        }).toThrow('[test] is smaller (4) than the allowed minimum (5)');
+        }).toThrow('[test] is smaller than the allowed minimum (5)');
 
         expect(() => {
             float({max: 10})(12, 'test');
-        }).toThrow('[test] is larger (12) than the allowed maximum (10)');
+        }).toThrow('[test] is larger than the allowed maximum (10)');
 
         expect(float()(0.5, 'test')).toEqual(0.5);
 
@@ -126,11 +127,11 @@ describe('validation functions', () => {
 
         expect(() => {
             string({min: 2, max: 4})('value', 'test');
-        }).toThrow('[test] has more characters (5) than the allowed maximum (4)');
+        }).toThrow('[length(test)] is larger than the allowed maximum (4)');
 
         expect(() => {
             string({min: 2, max: 4})('', 'test');
-        }).toThrow('[test] has fewer characters (0) than the allowed minimum (2)');
+        }).toThrow('[length(test)] is smaller than the allowed minimum (2)');
 
         expect(() => {
             string({pattern: /^[a-z]{3}$/i})('aaaa', 'test');
@@ -174,7 +175,7 @@ describe('validation functions', () => {
                 min: 2,
                 max: 3,
             })({a: 5}, 'test');
-        }).toThrow('[test] has fewer keys (1) than the allowed minimum (2)');
+        }).toThrow('[size(test)] is smaller than the allowed minimum (2)');
 
         expect(() => {
             object({}, {
@@ -182,7 +183,7 @@ describe('validation functions', () => {
                 min: 2,
                 max: 3,
             })({a: 5, b: 5, c: 5, d: 5}, 'test');
-        }).toThrow('[test] has more keys (4) than the allowed maximum (3)');
+        }).toThrow('[size(test)] is larger than the allowed maximum (3)');
 
         expect(object({}, {
             ignoreUnknown: true,
@@ -218,7 +219,7 @@ describe('validation functions', () => {
 
         expect(() => {
             arrayOf(int(), {max: 2})([1, 2, 3, 'abc'], 'test');
-        }).toThrow('[test] has more items (4) than the allowed maximum (2)');
+        }).toThrow('[length(test)] is larger than the allowed maximum (2)');
 
         expect(arrayOf(optional(string()))(['1', '2', '3'], 'test')).toEqual(['1', '2', '3']);
 
@@ -233,7 +234,7 @@ describe('validation functions', () => {
         expect(exact(1)(1, 'test')).toEqual(1);
         expect(() => {
             exact(1)(2, 'test');
-        }).toThrow('[test] isn\'t equal to value (1)');
+        }).toThrow('[test] isn\'t equal to the expected value');
     });
 
     it('should validate oneOf correctly', () => {
@@ -241,15 +242,15 @@ describe('validation functions', () => {
 
         expect(() => {
             oneOf([1, 2, '3'])(3, 'test');
-        }).toThrow('[test] isn\'t equal to any of the enumerated values (1 | 2 | "3")');
+        }).toThrow('[test] isn\'t equal to any of the expected values');
 
         expect(() => {
             oneOf([1, 2, '3'])(undefined, 'test');
-        }).toThrow('[test] isn\'t equal to any of the enumerated values (1 | 2 | "3")');
+        }).toThrow('[test] isn\'t equal to any of the expected values');
 
         expect(() => {
             oneOf([1, 2, {a: 1}])({a: 1}, 'test');
-        }).toThrow('[test] isn\'t equal to any of the enumerated values (1 | 2 | {"a":1})');
+        }).toThrow('[test] isn\'t equal to any of the expected values');
     });
 
     it('should validate alternatives correctly', () => {
@@ -257,13 +258,29 @@ describe('validation functions', () => {
 
         expect(() => {
             alternatives([string(), int()])(undefined, 'test');
-        }).toThrow('Input did not match any allowed options for [test]:\n\t[*] should be a string\tOR\n\t[*] should be an integer');
+        }).toThrow('[test] doesn\'t match any of allowed alternatives:\n  0: [*] should be a string\n  1: [*] should be an integer');
 
         expect(alternatives([string(), object({a: string()})])({a: '5'}, 'test')).toEqual({a: '5'});
 
         expect(() => {
             alternatives([string(), object({a: string()})])({a: 5}, 'test');
-        }).toThrow('Input did not match any allowed options for [test]:\n\t[*] should be a string\tOR\n\t[*.a] should be a string');
+        }).toThrow('[test] doesn\'t match any of allowed alternatives:\n  0: [*] should be a string\n  1: [*.a] should be a string');
+
+        expect(() => {
+            alternatives([
+                string(),
+                int(),
+                object({id: alternatives([
+                    string(),
+                    int(),
+                ])}),
+            ])({a: 5}, 'test');
+        }).toThrow('[test] doesn\'t match any of allowed alternatives:\n' +
+            '  0: [*] should be a string\n' +
+            '  1: [*] should be an integer\n' +
+            '  2: [*.id] doesn\'t match any of allowed alternatives:\n' +
+            '    0: [*] should be a string\n' +
+            '    1: [*] should be an integer');
     });
 
     it('should validate optional correctly', () => {
@@ -345,9 +362,18 @@ describe('validation functions', () => {
         expect(validator({type: 'user', id: '1'}, 'myValue')).toEqual('user:1');
         expect(() => {
             validator({type: 'user'}, 'myValue');
-        }).toThrow('Input did not match any allowed options for [myValue]:\n\t[*] should be a string\tOR\n\t[*.id] should be a string');
+        }).toThrow('[myValue] doesn\'t match any of allowed alternatives:\n  0: [*] should be a string\n  1: [*.id] should be a string');
         expect(() => {
             validator('asd', 'myValue');
-        }).toThrow('Input did not match any allowed options for [myValue]:\n\t[*] doesn\'t match the pattern\tOR\n\t[*] should be an object');
+        }).toThrow('[myValue] doesn\'t match any of allowed alternatives:\n  0: [*] doesn\'t match the pattern\n  1: [*] should be an object');
+    });
+
+    it('should throw with ValidateError', () => {
+        try {
+            int()("a", 'test');
+        } catch (err) {
+            expect(err).toBeInstanceOf(ValidationError);
+            expect(err.name).toEqual('ValidationError');
+        }
     });
 });

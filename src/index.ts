@@ -3,21 +3,21 @@
 export type Validator<T> = (v: any, path: string) => T;
 
 export class ValidationError extends Error {
-    name = "ValidationError";
+    public name = 'ValidationError';
+    constructor(message: string) {
+        super(message);
+        // fix custom error prototype in case of using with ES5
+        Object.setPrototypeOf(this, ValidationError.prototype);
+    }
 }
 
-function assert_fewer(min: number, actual: number, unit: string, path: string) {
-    if(actual < min) throw new ValidationError(`[${path}] has fewer ${unit} (${actual}) than the allowed minimum (${min})`);
-}
-function assert_more(max: number, actual: number, unit: string, path: string) {
-    if(actual > max) throw new ValidationError(`[${path}] has more ${unit} (${actual}) than the allowed maximum (${max})`);
-}
-
-function assert_larger(min: number, actual: number, path: string) {
-    if(actual < min) throw new ValidationError(`[${path}] is smaller (${actual}) than the allowed minimum (${min})`);
-}
-function assert_smaller(max: number, actual: number, path: string) {
-    if(actual > max) throw new ValidationError(`[${path}] is larger (${actual}) than the allowed maximum (${max})`);
+function assertValueInRange(actual: number, min: number | undefined, max: number | undefined, path: string) {
+    if (min !== undefined && actual < min) {
+        throw new ValidationError(`[${path}] is smaller than the allowed minimum (${min})`);
+    }
+    if (max !== undefined && actual > max) {
+        throw new ValidationError(`[${path}] is larger than the allowed maximum (${max})`);
+    }
 }
 
 export const optional = <T>(handler: Validator<T>): Validator<T | undefined> => (v, path) => {
@@ -58,8 +58,7 @@ export const object = <Description extends Record<string, Validator<any>>>(
     for (const key in desc) {
         res[key] = desc[key](v[key], `${path}.${key}`);
     }
-    if(min !== undefined) assert_fewer(min, Object.keys(v).length, "keys", path);
-    if(max !== undefined) assert_more(max, Object.keys(v).length, "keys", path);
+    assertValueInRange(Object.keys(v).length, min, max, `size(${path})`);
     for (const key in v) {
         if (!desc[key]) {
             if (ignoreUnknown) {
@@ -97,8 +96,7 @@ export const string = ({pattern, min, max}: {
     if (pattern && !pattern.test(v)) {
         throw new ValidationError(`[${path}] doesn't match the pattern`);
     }
-    if(min !== undefined) assert_fewer(min, v.length, "characters", path);
-    if(max !== undefined) assert_more(max, v.length, "characters", path);
+    assertValueInRange(v.length, min, max, `length(${path})`);
     return v;
 }
 
@@ -106,9 +104,7 @@ export const int = ({min, max}: {min?: number; max?: number} = {}): Validator<nu
     if (!Number.isInteger(v)) {
         throw new ValidationError(`[${path}] should be an integer`);
     }
-
-    if(min !== undefined) assert_larger(min, v, path);
-    if(max !== undefined) assert_smaller(max, v, path);
+    assertValueInRange(v, min, max, path);
     return v;
 };
 
@@ -124,8 +120,7 @@ export const float = ({min, max}: {min?: number, max?: number} = {}): Validator<
     if (!Number.isFinite(n)) {
         throw new ValidationError(`[${path}] should be a float`);
     }
-    if(min !== undefined) assert_larger(min, v, path);
-    if(max !== undefined) assert_smaller(max, v, path);
+    assertValueInRange(v, min, max, path);
     return n;
 };
 
@@ -144,10 +139,14 @@ export const alternatives = <Alts extends ReadonlyArray<Validator<any>>>(
         try {
             return alts[i](v, `*`);
         } catch (err: any) {
-            errs.push(err.message);
+            if (err instanceof ValidationError) {
+                errs.push(`\n  ${i}: ${err.message.replace(/\n/g, '\n  ')}`);
+            } else {
+                throw err;
+            }
         }
     }
-    throw new ValidationError(`Input did not match any allowed options for [${path}]:\n\t${errs.join('\tOR\n\t')}`);
+    throw new ValidationError(`[${path}] doesn't match any of allowed alternatives:${errs.join('')}`);
 };
 
 export const arrayOf = <T>(itemValidator: Validator<T>, {min, max}: {
@@ -157,8 +156,7 @@ export const arrayOf = <T>(itemValidator: Validator<T>, {min, max}: {
     if (!Array.isArray(v)) {
         throw new ValidationError(`[${path}] should be an array`);
     }
-    if(min !== undefined) assert_fewer(min, v.length, "items", path);
-    if(max !== undefined) assert_more(max, v.length, "items", path);
+    assertValueInRange(v.length, min, max, `length(${path})`);
     return v.map((item, index) => itemValidator(item, `${path}[${index}]`));
 };
 
@@ -178,7 +176,7 @@ export const oneOf = <T>(
     values: ReadonlyArray<T>,
 ): Validator<T> => (v, path): T => {
     if (values.indexOf(v) === -1) {
-        throw new ValidationError(`[${path}] isn't equal to any of the enumerated values (${values.map((v) => JSON.stringify(v)).join(" | ")})`);
+        throw new ValidationError(`[${path}] isn't equal to any of the expected values`);
     }
     return v;
 };
@@ -187,7 +185,7 @@ export const exact = <T>(
     value: T,
 ): Validator<T> => (v, path) => {
     if (value !== v) {
-        throw new ValidationError(`[${path}] isn't equal to value (${JSON.stringify(value)})`);
+        throw new ValidationError(`[${path}] isn't equal to the expected value`);
     }
     return v;
 };
