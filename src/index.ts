@@ -2,6 +2,24 @@
 
 export type Validator<T> = (v: any, path: string) => T;
 
+export class ValidationError extends Error {
+    public name = 'ValidationError';
+    constructor(message: string) {
+        super(message);
+        // fix custom error prototype in case of using with ES5
+        Object.setPrototypeOf(this, ValidationError.prototype);
+    }
+}
+
+function assertValueInRange(actual: number, min: number | undefined, max: number | undefined, path: string) {
+    if (min !== undefined && actual < min) {
+        throw new ValidationError(`[${path}] is smaller than the allowed minimum (${min})`);
+    }
+    if (max !== undefined && actual > max) {
+        throw new ValidationError(`[${path}] is larger than the allowed maximum (${max})`);
+    }
+}
+
 export const optional = <T>(handler: Validator<T>): Validator<T | undefined> => (v, path) => {
     if (v === undefined) {
         return undefined;
@@ -34,21 +52,19 @@ export const object = <Description extends Record<string, Validator<any>>>(
     [key in keyof Description]: Description[key] extends Validator<infer T> ? T : never;
 }> => (v, path) => {
     if(typeof v !== 'object' || !v || Array.isArray(v)) {
-        throw new Error(`[${path}] should be an object`);
+        throw new ValidationError(`[${path}] should be an object`);
     }
     const res: any = {};
     for (const key in desc) {
         res[key] = desc[key](v[key], `${path}.${key}`);
     }
-    if ((min !== undefined && Object.keys(v).length < min) || (max !== undefined && Object.keys(v).length > max)) {
-        throw new Error(`[${path}] size isn\'t in allowed range`);
-    }
+    assertValueInRange(Object.keys(v).length, min, max, `size(${path})`);
     for (const key in v) {
         if (!desc[key]) {
             if (ignoreUnknown) {
                 res[key] = v[key];
             } else {
-                throw new Error(`Property [${path}.${key}] is unknown`);
+                throw new ValidationError(`Property [${path}.${key}] is unknown`);
             }
         }
     }
@@ -57,7 +73,7 @@ export const object = <Description extends Record<string, Validator<any>>>(
 
 export const boolean = (): Validator<boolean> => (v, path) => {
     if (typeof v !== 'boolean') {
-        throw new Error(`[${path}] should be a boolean`);
+        throw new ValidationError(`[${path}] should be a boolean`);
     }
     return v;
 };
@@ -75,24 +91,20 @@ export const string = ({pattern, min, max}: {
     max?: number;
 } = {}): Validator<string> => (v, path) => {
     if(typeof v !== 'string') {
-        throw new Error(`[${path}] should be a string`);
+        throw new ValidationError(`[${path}] should be a string`);
     }
     if (pattern && !pattern.test(v)) {
-        throw new Error(`[${path}] doesn't match the pattern`);
+        throw new ValidationError(`[${path}] doesn't match the pattern`);
     }
-    if ((min && v.length < min) || (max && v.length > max)) {
-        throw new Error(`[${path}] length isn\'t in allowed range`);
-    }
+    assertValueInRange(v.length, min, max, `length(${path})`);
     return v;
 }
 
 export const int = ({min, max}: {min?: number; max?: number} = {}): Validator<number> => (v, path) => {
     if (!Number.isInteger(v)) {
-        throw new Error(`[${path}] should be an integer`);
+        throw new ValidationError(`[${path}] should be an integer`);
     }
-    if ((min !== undefined && v < min) || (max !== undefined && v > max)) {
-        throw new Error(`[${path}] isn\'t in allowed range`);
-    }
+    assertValueInRange(v, min, max, path);
     return v;
 };
 
@@ -106,11 +118,9 @@ export const strToInt = (options?: Parameters<typeof int>[0]): Validator<number>
 export const float = ({min, max}: {min?: number, max?: number} = {}): Validator<number> => (v, path) => {
     const n = parseFloat(v);
     if (!Number.isFinite(n)) {
-        throw new Error(`[${path}] should be a float`);
+        throw new ValidationError(`[${path}] should be a float`);
     }
-    if ((min !== undefined && n < min) || (max !== undefined && n > max)) {
-        throw new Error(`[${path}] isn\'t in allowed range`);
-    }
+    assertValueInRange(v, min, max, path);
     return n;
 };
 
@@ -127,12 +137,16 @@ export const alternatives = <Alts extends ReadonlyArray<Validator<any>>>(
     const errs: string[] = [];
     for (let i = 0; i < alts.length; i++) {
         try {
-            return alts[i](v, `${path}.@alternative(${i})`);
+            return alts[i](v, `*`);
         } catch (err: any) {
-            errs.push(err.message);
+            if (err instanceof ValidationError) {
+                errs.push(`\n  ${i}: ${err.message.replace(/\n/g, '\n  ')}`);
+            } else {
+                throw err;
+            }
         }
     }
-    throw new Error(`All alternatives failed for [${path}]:\n\t${errs.join('\n\t')}`);
+    throw new ValidationError(`[${path}] doesn't match any of allowed alternatives:${errs.join('')}`);
 };
 
 export const arrayOf = <T>(itemValidator: Validator<T>, {min, max}: {
@@ -140,11 +154,9 @@ export const arrayOf = <T>(itemValidator: Validator<T>, {min, max}: {
     max?: number;
 } = {}): Validator<T[]> => (v, path) => {
     if (!Array.isArray(v)) {
-        throw new Error(`[${path}] should be an array`);
+        throw new ValidationError(`[${path}] should be an array`);
     }
-    if ((min !== undefined && v.length < min) || (max !== undefined && v.length > max)) {
-        throw new Error(`[${path}] length isn\'t in allowed range`);
-    }
+    assertValueInRange(v.length, min, max, `length(${path})`);
     return v.map((item, index) => itemValidator(item, `${path}[${index}]`));
 };
 
@@ -164,7 +176,7 @@ export const oneOf = <T>(
     values: ReadonlyArray<T>,
 ): Validator<T> => (v, path): T => {
     if (values.indexOf(v) === -1) {
-        throw new Error(`[${path}] isn't equal to any of predefined values`);
+        throw new ValidationError(`[${path}] isn't equal to any of the expected values`);
     }
     return v;
 };
@@ -173,7 +185,7 @@ export const exact = <T>(
     value: T,
 ): Validator<T> => (v, path) => {
     if (value !== v) {
-        throw new Error(`[${path}] isn't equal to predefined value`);
+        throw new ValidationError(`[${path}] isn't equal to the expected value`);
     }
     return v;
 };

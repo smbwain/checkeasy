@@ -1,5 +1,5 @@
-checkeasy
-----------
+# checkeasy
+
 
 Light, expressive and type-safe data validation in typescript.
 
@@ -8,8 +8,7 @@ Light, expressive and type-safe data validation in typescript.
 As you can see, you DON'T NEED to write your schema twice (for validation and for typescript).
 Just use validator functions, which return well typed results. So typescript is acknowledged about shape of your data and checks its usages on compilation stage.
 
-Why I need one more type validator?
------------------------------------
+# Why I need one more type validator?
 
 Because I wanted to have type validation which:
 
@@ -31,8 +30,7 @@ Because I wanted to have type validation which:
 
   Validator is a function. Adding new one is as simple, as writing new function.
 
-Documentation
--------------
+# Documentation
 
 - [Validators](#validators)
     - [int](#int)
@@ -56,8 +54,8 @@ Documentation
     - [transform](#transform)
 - [Custom validators](#custom-validators)
  
-Validators
-----------
+# Validators
+
 
 Although, it's really easy to create your own validators, library exports few ready to go ones.
 
@@ -74,11 +72,11 @@ Possible options:
 const validator1 = int() 
 validator1(5, 'myValue'); // returns: 5 
 
-const validator2 = int({min: 1}) // returns: 5
-validator2(5, 'myValue'); // returns: 5
+const validator2 = int() // returns: 5
+validator2('5', 'myValue'); // throws: [myValue] should be an integer
 
 const validator3 = int({min: 0, max: 4});
-validator3(5, 'myValue'); // throws: [myValue] isn't in allowed range
+validator3(5, 'myValue'); // throws: [myValue] is larger than the allowed maximum (4)
 ```
 
 ## strToInt
@@ -99,11 +97,11 @@ Possible options:
 const validator1 = float() 
 validator1(5.2, 'myValue'); // returns: 5 
 
-const validator2 = float({min: 1});
-validator2(5.2, 'myValue'); // returns: 5
+const validator2 = float();
+validator2('5.2', 'myValue'); // throws: [myValue] should be a float
 
 const validator3 = float({min: 0, max: 4});
-validator3(5.2, 'myValue'); // throws: [myValue] isn't in allowed range
+validator3(5.2, 'myValue'); // throws: [myValue] is larger than the allowed maximum (4)
 ```
 
 ## strToFloat
@@ -130,7 +128,7 @@ const validator2 = string()
 validator2({}, 'myValue'); // throws: [myValue] should be a string
 
 const validator3 = string({max: 3});
-validator3('aaaa', 'myValue'); // throws: [myValue] length isn't in allowed range
+validator3('aaaa', 'myValue'); // throws: [length(myValue)] is larger than the allowed maximum (4)
 
 const validator4 = string({patten: /^[a-z]{3}$/i});
 validator4('aaaa', 'myValue'); // throws: [myValue] doesn't match the pattern
@@ -214,7 +212,7 @@ const validator3 = arrayOf(int());
 validator3([1, 2, '3'], 'myValue'); // throws: [myValue[3]] should be an integer
 
 const validator4 = arrayOf(int(), {max: 2});
-validator4([1, 2, 3, 'abc'], 'myValue'); // throws: [myValue] length isn't in allowed range
+validator4([1, 2, 3, 'abc'], 'myValue'); // throws: [length(myValue)] is larger than the allowed maximum (2)
 
 const validator5 = arrayOf(
     object({
@@ -234,11 +232,11 @@ const validator1 = exact(1);
 validator1(1, 'myValue'); // returns: 1
 
 const validator2 = exact(1)
-validator2('1', 'myValue'); // throws: [myValue] isn't equal to predefined value
+validator2('1', 'myValue'); // throws: [myValue] isn't equal to the expected value
 
 const validator3 = exact({a: 1});
-validator3({a: 1}, 'myValue'); // throws: [myValue] isn't equal to predefined value
-    // it's because it doesn't make deepEqual
+validator3({a: 1}, 'myValue'); // throws: [myValue] isn't equal to the expected value
+    // it's because it doesn't call deepEqual, but uses with strict equality
 ```
 
 ## oneOf
@@ -250,11 +248,11 @@ const validator1 = oneOf([1, 2, '3'] as const);
 validator1('3', 'myValue'); // returns: 3
 
 const validator2 = oneOf([1, 2, '3'] as const)
-validator2(3, 'myValue'); // throws: [myValue] isn't equal to any of predefined values
+validator2(3, 'myValue'); // throws: [myValue] isn't equal to any of the expected values
 
 const validator3 = oneOf([1, 2, {a: 1}] as const);
-validator3({a: 1}, 'myValue'); // throws: [myValue] isn't equal to any of predefined values
-    // it's because it doesn't make deepEqual
+validator3({a: 1}, 'myValue'); // throws: [myValue] isn't equal to any of the expected values
+// it's because it doesn't call deepEqual, but uses with strict equality
 ```
 
 ___If you want typescript to make a type with exactly your values, add "as const" after array, to let typescript know -
@@ -269,12 +267,11 @@ const validator2 = oneOf([1, 2, '3']);
 const value2 = validator1(1, 'myValue');
 // but here type of value2 = number | string
 // as typescript recognizes type of your values array as Array<string | number> in this case
-// (pls let me know, if you have a solution to avoid "as const" here)
 ```
 
 ## alternatives
 
-Checks value with the help of each passed validator one by one. Returns value from first validator, which doesn't fail.
+Checks a value with the help of every of passed validators, one by one. Returns value from first validator, which doesn't fail.
 
 If all validators failed, throws an error.
 
@@ -288,9 +285,9 @@ const validator = alternatives([
 validator({a: '5'}, 'myValue'); // returns: {a: '5'}
 
 validator({a: 5}, 'myValue');
-//  throws: All alternatives failed for [myValue]:
-//      [myValue.@alternative(0)] should be a string
-//      [myValue.@alternative(1).a] should be a string
+//  throws: [myValue] doesn't match any of allowed alternatives:
+//    0: [*] should be a string
+//    1: [*.a] should be a string
 ```
 
 ## optional
@@ -336,11 +333,11 @@ validator({a: null}, 'myValue'); // throws: [myValue.a] should be a string
 
 ## uuid
 
-Checks if value is uuid.
+Checks if value is a valid uuid string.
 
 ## email
 
-Checks if value is email.
+Checks if value is a valid email string.
 
 ## any
 
@@ -376,18 +373,46 @@ const validator = alternatives([
 validator('user:1', 'myValue'); // returns: "user:1"
 validator({type: 'user', id: '1'}, 'myValue'); // returns "user:1"
 validator({type: 'user'}, 'myValue');
-//    throws: All alternatives failed for [myValue]:
-//       [myValue.@alternative(0)] should be a string
-//       [myValue.@alternative(1).id] should be a string
+//    throws: [myValue] doesn't match any of allowed alternatives:
+//      0: [*] should be a string
+//      1: [*.id] should be a string
 validator('asd', 'myValue');
-//    throws: All alternatives failed for [myValue]:
-//       [myValue.@alternative(0)] doesn't match the pattern
-//       [myValue.@alternative(1)] should be an object
+//    throws: [myValue] doesn't match any of allowed alternatives:
+//      0: [*] doesn't match the pattern
+//      1: [*] should be an object
 
 ``` 
 
-Custom validators
------------------
+Error handling
+--------------
+
+In the case of validation failed, validator throws instance of ValidationError. So, it's easy to catch it.
+
+```ts
+import {ValidationError, int} from './index';
+
+const validator = int();
+
+try {
+    
+    validator('a', 'myValue');
+    
+} catch (err) {
+      
+    if (err instanceof ValidationError) {
+        //...  
+    }
+  
+    // OR
+  
+    if (err.name === 'ValidationError') {
+        //...  
+    }
+    
+}
+```
+
+# Custom validators
 
 The idea here is simple. To check any type of value you should to create a validator.
 
@@ -397,9 +422,12 @@ __Validator is a function__ which receives 2 parameters: _value_ to validate and
 type Validator<T> = (v: any, path: string) => T;
 ```
 
-In case of validation error, validator should throw an error, using _path_ to point at a place of shape, where validation 
-failed. In case of success validator should return a value. Validator can return the same value which was received, or
-modify it if needed.
+In case of validation error, validator should throw a ValidationError,
+using _path_ to point at a place of shape, where validation failed.
+
+In case of success validator should return a value.
+Validator can return the same value which was received.
+Or some another value, if it should be modified on the fly.
 
 You can make inline validators. E.g.:
 
@@ -408,7 +436,7 @@ const myValidator = object({
   id: string(),
   type: (v, path): string => {
       if (typeof v !== 'string' || !v.startsWith('TYPE__')) {
-          throw new Error(`[${path}] is not correct type`);
+          throw new ValidationError(`[${path}] is not correct type`);
       }
       return v;
   }
@@ -416,15 +444,15 @@ const myValidator = object({
 ```
 
 If you want to crate reusable validator, the convention is to wrap it into one more function, which can additionally
-receive options as parameters. E.g. _int_ validator looks like:
+receive options as parameters. E.g. _int_ validator can look like:
 
 ```ts
 export const int = ({min, max}: {min?: number; max?: number} = {}): Validator<number> => (v, path) => {
     if (!Number.isInteger(v)) {
-        throw new Error(`[${path}] should be an integer`);
+        throw new ValidationError(`[${path}] should be an integer`);
     }
     if ((min !== undefined && v < min) || (max !== undefined && v > max)) {
-        throw new Error(`[${path}] isn\'t in allowed range`);
+        throw new ValidationError(`[${path}] isn\'t in allowed range`);
     }
     return v;
 };
@@ -441,7 +469,7 @@ const exactMatch = <T>(exactValue: T): Validator<T> => (v, path) => {
 };
 ```
 
-We can use itself:
+We can use it itself:
 
 ```ts
 // let's check value 
@@ -462,8 +490,17 @@ validator({a: 5, c: 10}, 'myValue'); // returns: { a: 5, b: undefined, c: 10 }
 validator({a: 5, c: 12}, 'myValue'); // throws: [myValue.c] isn't the same as allowed value
 ```
 
-License
--------
+# Changelog
+
+## [1.1.0] - 2022-05-20
+
+- Added ValidationError, improved error messages.
+- Changed some error messages
+- Changes in README
+
+Thank you [joshuafcole](https://github.com/joshuafcole) for some changes here
+
+# License
 
 ISC
 
