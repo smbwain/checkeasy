@@ -500,6 +500,10 @@ validator({a: 5, c: 12}, 'myValue'); // throws: [myValue.c] isn't the same as al
 
 Thank you [joshuafcole](https://github.com/joshuafcole) for some changes here
 
+## [1.2.0] - 2024-08-02
+
+- Fixed regular expression for email and uuid checks
+
 # License
 
 ISC
