@@ -1,7 +1,7 @@
 import {
     alternatives,
     arrayOf,
-    boolean, defaultValue, exact,
+    boolean, defaultValue, email, exact,
     float,
     int, nullable,
     object,
@@ -9,7 +9,7 @@ import {
     optional,
     string, strToBoolean,
     strToFloat,
-    strToInt, transform,
+    strToInt, transform, UUID,
     ValidationError,
 } from '../src';
 
@@ -375,5 +375,35 @@ describe('validation functions', () => {
             expect(err).toBeInstanceOf(ValidationError);
             expect(err.name).toEqual('ValidationError');
         }
+    });
+
+    it('should check uuid correctly', () => {
+        expect(UUID()('782bc66a-50df-11ef-9454-0242ac120002', 'uuid1')).toEqual('782bc66a-50df-11ef-9454-0242ac120002');
+        expect(UUID()('adb53d10-97a3-4850-935d-0159d013e4a2', 'uuid4')).toEqual('adb53d10-97a3-4850-935d-0159d013e4a2');
+        expect(UUID()('01911399-122c-72a8-a2c1-1dd0acc8c091', 'uuid7')).toEqual('01911399-122c-72a8-a2c1-1dd0acc8c091');
+
+        expect(() => {
+            UUID()(' adb53d10-97a3-4850-935d-0159d013e4a2', 'wrong-uuid');
+        }).toThrow('[wrong-uuid] doesn\'t match the pattern');
+        expect(() => {
+            UUID()(123, 'wrong-type');
+        }).toThrow('[wrong-type] should be a string');
+        expect(() => {
+            UUID()('asd', 'wrong-value');
+        }).toThrow('[wrong-value] doesn\'t match the pattern');
+    });
+
+    it('should check email correctly', () => {
+        expect(email()('example@example.com', 'email')).toEqual('example@example.com');
+
+        expect(() => {
+            email()('example@example@example.com', 'wrong-email');
+        }).toThrow('[wrong-email] doesn\'t match the pattern');
+        expect(() => {
+            email()(' example@example@excample.com', 'wrong-email');
+        }).toThrow('[wrong-email] doesn\'t match the pattern');
+        expect(() => {
+            email()('', 'empty-email');
+        }).toThrow('[empty-email] doesn\'t match the pattern');
     });
 });
